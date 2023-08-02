@@ -13,7 +13,7 @@ android {
         versionCode 9
         versionName "0.1.9"
         externalNativeBuild.ndkBuild {
-            arguments "APP_PLATFORM=android-14", "APP_ALLOW_MISSING_DEPS=true"
+            arguments "APP_PLATFORM=android-29", "APP_ALLOW_MISSING_DEPS=true"
         }
     }
 

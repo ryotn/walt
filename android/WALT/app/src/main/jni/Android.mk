@@ -20,7 +20,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := sync_clock_jni
 LOCAL_SRC_FILES := sync_clock_jni.c sync_clock.c player.c
 
-LOCAL_CFLAGS := -g -DUSE_LIBLOG -Werror
+LOCAL_CFLAGS := -nostartfiles -g -DUSE_LIBLOG -Werror
 
 # needed for logcat
 LOCAL_SHARED_LIBRARIES := libcutils
