@@ -128,7 +128,7 @@ public abstract class BaseUsbConnection {
         // result of intent filter when the device was plugged in.
 
         PendingIntent permissionIntent = PendingIntent.getBroadcast(context, 0,
-                new Intent(getUsbPermissionResponseIntent()), 0);
+                new Intent(getUsbPermissionResponseIntent()), PendingIntent.FLAG_MUTABLE);
         context.registerReceiver(respondToUsbPermission,
                 new IntentFilter(getUsbPermissionResponseIntent()));
         logger.log("Requesting permission for USB device.");
