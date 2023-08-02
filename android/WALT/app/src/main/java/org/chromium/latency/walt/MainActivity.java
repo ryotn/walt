@@ -49,6 +49,8 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.github.mikephil.charting.BuildConfig;
+
 import org.chromium.latency.walt.programmer.Programmer;
 
 import java.io.File;
@@ -221,17 +223,16 @@ public class MainActivity extends AppCompatActivity {
 
         Log.i(TAG, "Toolbar button: " + item.getTitle());
 
-        switch (item.getItemId()) {
-            case R.id.action_help:
-                return true;
-            case R.id.action_share:
-                attemptSaveAndShareLog();
-                return true;
-            case R.id.action_upload:
-                showUploadLogDialog();
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
+        if (item.getItemId() == R.id.action_help) {
+            return true;
+        } else if (item.getItemId() == R.id.action_share) {
+            attemptSaveAndShareLog();
+            return true;
+        } else if (item.getItemId() == R.id.action_upload) {
+            showUploadLogDialog();
+            return true;
+        } else {
+            return super.onOptionsItemSelected(item);
         }
     }
 

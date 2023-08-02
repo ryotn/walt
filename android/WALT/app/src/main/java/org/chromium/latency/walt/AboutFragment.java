@@ -25,6 +25,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import com.github.mikephil.charting.BuildConfig;
+
 
 /**
  * A screen that shows information about WALT.
