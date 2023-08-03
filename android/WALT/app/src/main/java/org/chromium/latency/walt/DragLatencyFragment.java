@@ -171,8 +171,12 @@ public class DragLatencyFragment extends Fragment implements View.OnClickListene
 
     void restartMeasurement() {
         logger.log("\n## Restarting drag latency test. Re-sync clocks ...");
+        touchCatcher.stopAnimation();
+        waltDevice.stopListener();
+
         try {
             waltDevice.syncClock();
+            waltDevice.startListener();
         } catch (IOException e) {
             logger.log("Error syncing clocks: " + e.getMessage());
         }
