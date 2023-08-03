@@ -33,6 +33,7 @@ import android.os.StrictMode;
 import android.preference.PreferenceManager;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -450,6 +451,10 @@ public class MainActivity extends AppCompatActivity {
 
     public void shareLogFile(String filepath) {
         File file = new File(filepath);
+        Uri uri = FileProvider.getUriForFile(
+                this
+                ,getApplicationContext().getPackageName() + ".provider"
+                , file);
         logger.log("Firing Intent.ACTION_SEND for file:");
         logger.log(file.getPath());
 
@@ -458,7 +463,7 @@ public class MainActivity extends AppCompatActivity {
 
         i.putExtra(Intent.EXTRA_SUBJECT, "WALT log");
         i.putExtra(Intent.EXTRA_TEXT, "Attaching log file " + file.getPath());
-        i.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(file));
+        i.putExtra(Intent.EXTRA_STREAM, uri);
 
         try {
             startActivity(Intent.createChooser(i, "Send mail..."));
