@@ -215,6 +215,7 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
             if (initiatedBlinks == 0 && detectedBlinks > 1) {
                 logger.log("Unexpected blinks detected, probably PWM, turn it off");
                 isTestRunning = false;
+                finishAndShowStats();
                 stopButton.setEnabled(false);
                 startButton.setEnabled(true);
                 showPwmDialog();
@@ -284,8 +285,14 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
                     logger.log("got incoming but initiatedBlinks = 0");
                     return;
                 } else {
-                    logger.log("Looks like PWM is used for this screen, turn auto brightness off and set it to max brightness");
-                    showPwmDialog();
+                    if (isTestRunning) {
+                        isTestRunning = false;
+                        finishAndShowStats();
+                        stopButton.setEnabled(false);
+                        startButton.setEnabled(true);
+                        logger.log("Looks like PWM is used for this screen, turn auto brightness off and set it to max brightness");
+                        showPwmDialog();
+                    }
                     return;
                 }
             }
