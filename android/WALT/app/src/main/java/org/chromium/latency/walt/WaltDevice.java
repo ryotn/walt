@@ -64,7 +64,7 @@ public class WaltDevice implements WaltConnection.ConnectionStateListener {
     private Context context;
     protected SimpleLogger logger;
     private WaltConnection connection;
-    public RemoteClockInfo clock;
+    public RemoteClockInfo clock = new RemoteClockInfo();
     private WaltConnection.ConnectionStateListener connectionStateListener;
 
     private static final Object LOCK = new Object();
@@ -135,7 +135,7 @@ public class WaltDevice implements WaltConnection.ConnectionStateListener {
     }
 
     public boolean isConnected() {
-        return connection.isConnected();
+        return connection != null && connection.isConnected();
     }
 
 
@@ -218,7 +218,14 @@ public class WaltDevice implements WaltConnection.ConnectionStateListener {
     }
 
     public void syncClock() throws IOException {
-        clock = connection.syncClock();
+        if (!isConnected()) {
+            throw new IOException("Not connected to WALT");
+        }
+        RemoteClockInfo syncedClock = connection.syncClock();
+        if (syncedClock == null) {
+            throw new IOException("Failed to sync clocks");
+        }
+        clock = syncedClock;
     }
 
     // Simple way of syncing clocks. Used for diagnostics. Accuracy of several ms.
