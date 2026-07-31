@@ -24,8 +24,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.media.AudioManager;
 import android.os.Bundle;
-import androidx.fragment.app.Fragment;
-import androidx.core.content.ContextCompat;
+import android.support.v4.app.Fragment;
+import android.support.v4.content.ContextCompat;
 import android.text.method.ScrollingMovementMethod;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -104,7 +104,8 @@ public class AudioFragment extends Fragment implements View.OnClickListener,
         modeSpinner = (Spinner) view.findViewById(R.id.spinner_audio_mode);
         ArrayAdapter<CharSequence> modeAdapter = ArrayAdapter.createFromResource(getContext(),
                 R.array.audio_mode_array, android.R.layout.simple_spinner_item);
-        modeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        modeAdapter.setDropDownViewResource(
+                android.support.design.R.layout.support_simple_spinner_dropdown_item);
         modeSpinner.setAdapter(modeAdapter);
 
         return view;
@@ -136,7 +137,8 @@ public class AudioFragment extends Fragment implements View.OnClickListener,
 
     @Override
     public void onClick(View v) {
-        if (v.getId() == R.id.button_start_audio) {
+        int id = v.getId();
+        if (id == R.id.button_start_audio) {
             chartLayout.setVisibility(View.GONE);
             disableButtons();
             AudioTestType testType = getSelectedTestType();
@@ -186,10 +188,10 @@ public class AudioFragment extends Fragment implements View.OnClickListener,
                     audioTest.beginPlaybackMeasurement();
                     break;
             }
-        } else if (v.getId() == R.id.button_stop_audio) {
-                audioTest.stopTest();
-        } else if (v.getId() == R.id.button_close_chart) {
-                chartLayout.setVisibility(View.GONE);
+        } else if (id == R.id.button_stop_audio) {
+            audioTest.stopTest();
+        } else if (id == R.id.button_close_chart) {
+            chartLayout.setVisibility(View.GONE);
         }
     }
 

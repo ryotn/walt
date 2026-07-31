@@ -20,7 +20,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import androidx.fragment.app.Fragment;
+import android.support.v4.app.Fragment;
 import android.text.method.ScrollingMovementMethod;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -79,20 +79,21 @@ public class MidiFragment extends Fragment
 
     @Override
     public void onClick(View v) {
-        if (v.getId() == R.id.button_start_midi_in) {
+        int id = v.getId();
+        if (id == R.id.button_start_midi_in) {
             disableButtons();
             latencyChart.setVisibility(View.VISIBLE);
             latencyChart.clearData();
             latencyChart.setLegendEnabled(false);
             latencyChart.getBarChart().getDescription().setText("MIDI Input Latency [ms]");
             midiTest.testMidiIn();
-        } else if (v.getId() == R.id.button_start_midi_out) {
-                disableButtons();
-                latencyChart.setVisibility(View.VISIBLE);
-                latencyChart.clearData();
-                latencyChart.setLegendEnabled(false);
-                latencyChart.getBarChart().getDescription().setText("MIDI Output Latency [ms]");
-                midiTest.testMidiOut();
+        } else if (id == R.id.button_start_midi_out) {
+            disableButtons();
+            latencyChart.setVisibility(View.VISIBLE);
+            latencyChart.clearData();
+            latencyChart.setLegendEnabled(false);
+            latencyChart.getBarChart().getDescription().setText("MIDI Output Latency [ms]");
+            midiTest.testMidiOut();
         }
     }
 

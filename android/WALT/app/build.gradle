@@ -2,19 +2,22 @@ apply plugin: 'com.android.application'
 
 
 android {
-    namespace "org.chromium.latency.walt"
-    compileSdkVersion 31
-    buildToolsVersion '33.0.0'
+    namespace = "org.chromium.latency.walt"
+    compileSdkVersion 36
 
     defaultConfig {
         applicationId "org.chromium.latency.walt"
-        minSdkVersion 29
-        targetSdkVersion 31
+        minSdkVersion 34
+        targetSdkVersion 36
         versionCode 9
         versionName "0.1.9"
         externalNativeBuild.ndkBuild {
-            arguments "APP_PLATFORM=android-29", "APP_ALLOW_MISSING_DEPS=true"
+            arguments "APP_PLATFORM=android-14", "APP_ALLOW_MISSING_DEPS=true"
         }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     externalNativeBuild.ndkBuild {
@@ -31,14 +34,13 @@ android {
             }
         }
     }
-    ndkVersion '25.2.9519653'
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.0.0'
-    implementation 'com.google.android.material:material:1.0.0'
-    implementation 'androidx.preference:preference:1.0.0'
-    implementation 'androidx.legacy:legacy-preference-v14:1.0.0'
+    implementation 'com.android.support:appcompat-v7:27.1.1'
+    implementation 'com.android.support:design:27.1.1'
+    implementation 'com.android.support:preference-v7:27.1.1'
+    implementation 'com.android.support:preference-v14:27.1.1'
     implementation 'com.github.PhilJay:MPAndroidChart:v3.0.1'
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.mockito:mockito-core:1.10.19'

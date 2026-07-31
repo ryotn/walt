@@ -31,26 +31,23 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.StrictMode;
 import android.preference.PreferenceManager;
-import androidx.annotation.NonNull;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.FileProvider;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
-import androidx.core.content.ContextCompat;
-import androidx.loader.content.Loader;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentTransaction;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.content.Loader;
+import android.support.v4.content.LocalBroadcastManager;
+import android.support.v7.app.AlertDialog;
+import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
-
-import com.github.mikephil.charting.BuildConfig;
 
 import org.chromium.latency.walt.programmer.Programmer;
 
@@ -224,17 +221,17 @@ public class MainActivity extends AppCompatActivity {
 
         Log.i(TAG, "Toolbar button: " + item.getTitle());
 
-        if (item.getItemId() == R.id.action_help) {
+        int itemId = item.getItemId();
+        if (itemId == R.id.action_help) {
             return true;
-        } else if (item.getItemId() == R.id.action_share) {
+        } else if (itemId == R.id.action_share) {
             attemptSaveAndShareLog();
             return true;
-        } else if (item.getItemId() == R.id.action_upload) {
+        } else if (itemId == R.id.action_upload) {
             showUploadLogDialog();
             return true;
-        } else {
-            return super.onOptionsItemSelected(item);
         }
+        return super.onOptionsItemSelected(item);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -315,8 +312,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onClickPing(View view) {
-        long t1 = waltDevice.clock.micros();
         try {
+            long t1 = waltDevice.clock.micros();
             waltDevice.command(WaltDevice.CMD_PING);
             long dt = waltDevice.clock.micros() - t1;
             logger.log(String.format(Locale.US,
@@ -451,10 +448,6 @@ public class MainActivity extends AppCompatActivity {
 
     public void shareLogFile(String filepath) {
         File file = new File(filepath);
-        Uri uri = FileProvider.getUriForFile(
-                this
-                ,getApplicationContext().getPackageName() + ".provider"
-                , file);
         logger.log("Firing Intent.ACTION_SEND for file:");
         logger.log(file.getPath());
 
@@ -463,7 +456,7 @@ public class MainActivity extends AppCompatActivity {
 
         i.putExtra(Intent.EXTRA_SUBJECT, "WALT log");
         i.putExtra(Intent.EXTRA_TEXT, "Attaching log file " + file.getPath());
-        i.putExtra(Intent.EXTRA_STREAM, uri);
+        i.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(file));
 
         try {
             startActivity(Intent.createChooser(i, "Send mail..."));

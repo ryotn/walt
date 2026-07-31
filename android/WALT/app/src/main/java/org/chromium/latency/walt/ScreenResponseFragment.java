@@ -22,10 +22,10 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
-import androidx.fragment.app.Fragment;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
+import android.support.v4.app.Fragment;
+import android.support.v7.app.ActionBar;
+import android.support.v7.app.AlertDialog;
+import android.support.v7.app.AppCompatActivity;
 import android.text.method.ScrollingMovementMethod;
 import android.view.Choreographer;
 import android.view.LayoutInflater;
@@ -125,7 +125,8 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
         buttonBarView = view.findViewById(R.id.button_bar);
         ArrayAdapter<CharSequence> modeAdapter = ArrayAdapter.createFromResource(getContext(),
                 R.array.screen_response_mode_array, android.R.layout.simple_spinner_item);
-        modeAdapter.setDropDownViewResource(androidx.preference.R.layout.support_simple_spinner_dropdown_item);
+        modeAdapter.setDropDownViewResource(
+                android.support.design.R.layout.support_simple_spinner_dropdown_item);
         spinner.setAdapter(modeAdapter);
         stopButton.setEnabled(false);
         blackBox.setMovementMethod(new ScrollingMovementMethod());
@@ -215,7 +216,6 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
             if (initiatedBlinks == 0 && detectedBlinks > 1) {
                 logger.log("Unexpected blinks detected, probably PWM, turn it off");
                 isTestRunning = false;
-                finishAndShowStats();
                 stopButton.setEnabled(false);
                 startButton.setEnabled(true);
                 showPwmDialog();
@@ -285,14 +285,8 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
                     logger.log("got incoming but initiatedBlinks = 0");
                     return;
                 } else {
-                    if (isTestRunning) {
-                        isTestRunning = false;
-                        finishAndShowStats();
-                        stopButton.setEnabled(false);
-                        startButton.setEnabled(true);
-                        logger.log("Looks like PWM is used for this screen, turn auto brightness off and set it to max brightness");
-                        showPwmDialog();
-                    }
+                    logger.log("Looks like PWM is used for this screen, turn auto brightness off and set it to max brightness");
+                    showPwmDialog();
                     return;
                 }
             }
