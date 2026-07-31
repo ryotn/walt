@@ -201,27 +201,28 @@ void Java_org_chromium_latency_walt_AudioTest_createAudioRecorder(JNIEnv* env,
 {
     SLresult result;
 
-    __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "Creating audio recorder with frame rate %d and frames to record %d",
+    __android_log_print(ANDROID_LOG_VERBOSE, APPNAME,
+                        "Creating audio recorder with frame rate %d and frames to record %d",
                         optimalFrameRate, framesToRecord);
-if (engineEngine == NULL) {
-    __android_log_print(ANDROID_LOG_ERROR, APPNAME,
-                        "Audio engine is not initialized; recorder unavailable");
-    return;
-}
+    destroyRecorder();
 
-destroyRecorder();
+    if (engineEngine == NULL) {
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "Audio engine is not initialized; recorder unavailable");
+        return;
+    }
 
-// Allocate buffer
-recorder_frames = framesToRecord;
-recorderBuffer = malloc(sizeof(*recorderBuffer) * recorder_frames);
-if (recorderBuffer == NULL) {
-    __android_log_print(ANDROID_LOG_ERROR, APPNAME,
-                        "Failed to allocate recorder buffer for %u frames", recorder_frames);
-    recorder_frames = 0;
-    return;
-}
+    // Allocate buffer
+    recorder_frames = framesToRecord;
+    recorderBuffer = malloc(sizeof(*recorderBuffer) * recorder_frames);
+    if (recorderBuffer == NULL) {
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "Failed to allocate recorder buffer for %u frames", recorder_frames);
+        recorder_frames = 0;
+        return;
+    }
 
-// configure audio source
+    // configure audio source
     SLDataLocator_IODevice loc_dev = {
             SL_DATALOCATOR_IODEVICE,
             SL_IODEVICE_AUDIOINPUT,
@@ -385,10 +386,7 @@ void Java_org_chromium_latency_walt_AudioTest_startRecording(JNIEnv* env, jclass
 jshortArray Java_org_chromium_latency_walt_AudioTest_getRecordedWave(JNIEnv *env, jclass cls)
 {
     jshortArray result;
-    jsize frames = recorder_frames;
-    if (recorderBuffer == NULL || frames < 0) {
-        frames = 0;
-    }
+    jsize frames = (recorderBuffer == NULL) ? 0 : (jsize) recorder_frames;
     result = (*env)->NewShortArray(env, frames);
     if (result == NULL) {
         return NULL; /* out of memory error thrown */
