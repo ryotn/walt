@@ -132,7 +132,7 @@ Median callback to output time 9.9 ms
 ```
 
 The callback to output time on the last line, 9.9 ms is the time from the execution of the
-[OpenSLES BufferQueue callback that enqueued the buffer](https://github.com/google/walt/blob/master/android/WALT/app/src/main/jni/player.c#L107)
+native Oboe output callback that marks playback timestamp
 until the first frames of that buffer were detected by WALT device via the headphone jack.
 
 

@@ -29,8 +29,7 @@ until there is a detectable signal on the wire. Note that this does not include 
 
 ##### Recording
 The reported latency is the time from the moment the last frame in a buffer was recorded until the
-[recorder callback](https://github.com/google/walt/blob/v0.1.6/android/WALT/app/src/main/jni/player.c#L345)
-receiving that buffer is executed.
+native Oboe recorder callback receiving that buffer is executed.
 
 TODO: Is the round trip latency expected to be Recording latency + Playback latency + one buffer length?
 
