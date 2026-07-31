@@ -76,6 +76,9 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
     private boolean shouldShowLatencyChart = false;
     private boolean isTestRunning = false;
     private boolean enableFullScreen = false;
+    private boolean shouldAutoIncreaseBrightness = false;
+    private float previousScreenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+    private boolean screenBrightnessOverridden = false;
     private boolean isFastPathGraphics = false;
     int initiatedBlinks = 0;
     int detectedBlinks = 0;
@@ -135,9 +138,8 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
         brightnessChart = (LineChart) view.findViewById(R.id.chart);
         latencyChart = (HistogramChart) view.findViewById(R.id.latency_chart);
 
-        if (getBooleanPreference(getContext(), R.string.preference_auto_increase_brightness, true)) {
-            increaseScreenBrightness();
-        }
+        shouldAutoIncreaseBrightness =
+                getBooleanPreference(getContext(), R.string.preference_auto_increase_brightness, true);
         return view;
     }
 
@@ -145,6 +147,9 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
     public void onResume() {
         super.onResume();
         logger.registerReceiver(logReceiver);
+        if (shouldAutoIncreaseBrightness) {
+            increaseScreenBrightness();
+        }
         // Register this fragment class as the listener for some button clicks
         startButton.setOnClickListener(this);
         stopButton.setOnClickListener(this);
@@ -153,6 +158,9 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
     @Override
     public void onPause() {
         logger.unregisterReceiver(logReceiver);
+        if (shouldAutoIncreaseBrightness) {
+            restoreScreenBrightness();
+        }
         super.onPause();
     }
 
@@ -550,9 +558,22 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
     }
 
     private void increaseScreenBrightness() {
+        if (getActivity() == null) return;
         final WindowManager.LayoutParams layoutParams = getActivity().getWindow().getAttributes();
+        if (!screenBrightnessOverridden) {
+            previousScreenBrightness = layoutParams.screenBrightness;
+        }
         layoutParams.screenBrightness = 1f;
         getActivity().getWindow().setAttributes(layoutParams);
+        screenBrightnessOverridden = true;
+    }
+
+    private void restoreScreenBrightness() {
+        if (!screenBrightnessOverridden || getActivity() == null) return;
+        final WindowManager.LayoutParams layoutParams = getActivity().getWindow().getAttributes();
+        layoutParams.screenBrightness = previousScreenBrightness;
+        getActivity().getWindow().setAttributes(layoutParams);
+        screenBrightnessOverridden = false;
     }
 
     private void setFullScreen(boolean enable) {
