@@ -147,6 +147,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         Thread.setDefaultUncaughtExceptionHandler(new LoggingExceptionHandler());
         setContentView(R.layout.activity_main);
+        applyStatusBarAppearance();
 
         // App bar
         toolbar = findViewById(R.id.toolbar_main);
@@ -532,11 +533,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void clearFullscreenMode() {
+        View decorView = getWindow().getDecorView();
+        decorView.setSystemUiVisibility(0);
         WindowInsetsControllerCompat insetsController =
-                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+                WindowCompat.getInsetsController(getWindow(), decorView);
         if (insetsController != null) {
             insetsController.show(WindowInsetsCompat.Type.systemBars());
         }
+        applyStatusBarAppearance();
+    }
+
+    void applyStatusBarAppearance() {
+        WindowInsetsControllerCompat insetsController =
+                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        if (insetsController != null) {
+            insetsController.setAppearanceLightStatusBars(true);
+        }
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.ColorPrimary));
     }
 
     private static <T extends Parcelable> T getParcelableExtra(

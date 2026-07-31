@@ -26,6 +26,9 @@ import androidx.fragment.app.Fragment;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import android.text.method.ScrollingMovementMethod;
 import android.view.Choreographer;
 import android.view.LayoutInflater;
@@ -76,6 +79,9 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
     private boolean shouldShowLatencyChart = false;
     private boolean isTestRunning = false;
     private boolean enableFullScreen = false;
+    private boolean shouldAutoIncreaseBrightness = false;
+    private float previousScreenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE;
+    private boolean screenBrightnessOverridden = false;
     private boolean isFastPathGraphics = false;
     int initiatedBlinks = 0;
     int detectedBlinks = 0;
@@ -135,9 +141,8 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
         brightnessChart = (LineChart) view.findViewById(R.id.chart);
         latencyChart = (HistogramChart) view.findViewById(R.id.latency_chart);
 
-        if (getBooleanPreference(getContext(), R.string.preference_auto_increase_brightness, true)) {
-            increaseScreenBrightness();
-        }
+        shouldAutoIncreaseBrightness =
+                getBooleanPreference(getContext(), R.string.preference_auto_increase_brightness, true);
         return view;
     }
 
@@ -145,6 +150,9 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
     public void onResume() {
         super.onResume();
         logger.registerReceiver(logReceiver);
+        if (shouldAutoIncreaseBrightness) {
+            increaseScreenBrightness();
+        }
         // Register this fragment class as the listener for some button clicks
         startButton.setOnClickListener(this);
         stopButton.setOnClickListener(this);
@@ -153,6 +161,10 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
     @Override
     public void onPause() {
         logger.unregisterReceiver(logReceiver);
+        setFullScreen(false);
+        if (shouldAutoIncreaseBrightness) {
+            restoreScreenBrightness();
+        }
         super.onPause();
     }
 
@@ -550,25 +562,58 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
     }
 
     private void increaseScreenBrightness() {
+        if (getActivity() == null) return;
         final WindowManager.LayoutParams layoutParams = getActivity().getWindow().getAttributes();
+        if (!screenBrightnessOverridden) {
+            previousScreenBrightness = layoutParams.screenBrightness;
+        }
         layoutParams.screenBrightness = 1f;
         getActivity().getWindow().setAttributes(layoutParams);
+        screenBrightnessOverridden = true;
+    }
+
+    private void restoreScreenBrightness() {
+        if (!screenBrightnessOverridden || getActivity() == null) return;
+        final WindowManager.LayoutParams layoutParams = getActivity().getWindow().getAttributes();
+        layoutParams.screenBrightness = previousScreenBrightness;
+        getActivity().getWindow().setAttributes(layoutParams);
+        screenBrightnessOverridden = false;
     }
 
     private void setFullScreen(boolean enable) {
         final AppCompatActivity activity = (AppCompatActivity) getActivity();
-        final ActionBar actionBar = activity != null ? activity.getSupportActionBar() : null;
-        int newVisibility = 0;
+        if (activity == null) return;
+        final ActionBar actionBar = activity.getSupportActionBar();
+        final View decorView = activity.getWindow().getDecorView();
+        final WindowInsetsControllerCompat insetsController =
+                WindowCompat.getInsetsController(activity.getWindow(), decorView);
         if (enable) {
             if (actionBar != null) actionBar.hide();
-            buttonBarView.setVisibility(View.GONE);
-            newVisibility |= View.SYSTEM_UI_FLAG_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+            if (buttonBarView != null) {
+                buttonBarView.setVisibility(View.GONE);
+            }
+            if (insetsController != null) {
+                insetsController.setSystemBarsBehavior(
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                insetsController.hide(WindowInsetsCompat.Type.systemBars());
+            } else {
+                decorView.setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            }
         } else {
             if (actionBar != null) actionBar.show();
-            buttonBarView.setVisibility(View.VISIBLE);
+            if (buttonBarView != null) {
+                buttonBarView.setVisibility(View.VISIBLE);
+            }
+            decorView.setSystemUiVisibility(0);
+            if (insetsController != null) {
+                insetsController.show(WindowInsetsCompat.Type.systemBars());
+            }
+            if (activity instanceof MainActivity) {
+                ((MainActivity) activity).applyStatusBarAppearance();
+            }
         }
-        if (activity != null) activity.getWindow().getDecorView().setSystemUiVisibility(newVisibility);
     }
 }
