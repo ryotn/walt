@@ -24,8 +24,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.media.AudioManager;
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
-import android.support.v4.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+import androidx.core.content.ContextCompat;
 import android.text.method.ScrollingMovementMethod;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -105,7 +105,7 @@ public class AudioFragment extends Fragment implements View.OnClickListener,
         ArrayAdapter<CharSequence> modeAdapter = ArrayAdapter.createFromResource(getContext(),
                 R.array.audio_mode_array, android.R.layout.simple_spinner_item);
         modeAdapter.setDropDownViewResource(
-                android.support.design.R.layout.support_simple_spinner_dropdown_item);
+                android.R.layout.simple_spinner_dropdown_item);
         modeSpinner.setAdapter(modeAdapter);
 
         return view;

@@ -24,10 +24,14 @@ import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbManager;
-import android.support.v4.content.LocalBroadcastManager;
+import android.os.Build;
+import android.os.Parcelable;
+import androidx.annotation.NonNull;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.Objects;
 
 public abstract class BaseUsbConnection {
     private static final String USB_PERMISSION_RESPONSE_INTENT = "usb-permission-response";
@@ -149,9 +153,9 @@ public abstract class BaseUsbConnection {
 
     private BroadcastReceiver disconnectReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {
-            UsbDevice usbDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-            if (isConnected() && BaseUsbConnection.this.usbDevice.equals(usbDevice)) {
+        public void onReceive(@NonNull Context context, @NonNull Intent intent) {
+            UsbDevice usbDevice = getParcelableExtra(intent, UsbManager.EXTRA_DEVICE, UsbDevice.class);
+            if (isConnected() && Objects.equals(BaseUsbConnection.this.usbDevice, usbDevice)) {
                 logger.log("WALT was detached");
                 disconnect();
             }
@@ -160,7 +164,7 @@ public abstract class BaseUsbConnection {
 
     private BroadcastReceiver respondToUsbPermission = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {
+        public void onReceive(@NonNull Context context, @NonNull Intent intent) {
             if (usbDevice == null) {
                 logger.log("USB device was not properly opened");
                 return;
@@ -219,5 +223,13 @@ public abstract class BaseUsbConnection {
 
     public void setConnectionStateListener(WaltConnection.ConnectionStateListener connectionStateListener) {
         this.connectionStateListener = connectionStateListener;
+    }
+
+    private static <T extends Parcelable> T getParcelableExtra(
+            @NonNull Intent intent, @NonNull String key, @NonNull Class<T> type) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return intent.getParcelableExtra(key, type);
+        }
+        return intent.getParcelableExtra(key);
     }
 }

@@ -140,7 +140,7 @@ public class DragLatencyFragment extends Fragment implements View.OnClickListene
         ArrayAdapter<CharSequence> sourceAdapter = ArrayAdapter.createFromResource(getContext(),
                 R.array.input_source_array, android.R.layout.simple_spinner_item);
         sourceAdapter.setDropDownViewResource(
-                android.support.design.R.layout.support_simple_spinner_dropdown_item);
+                android.R.layout.simple_spinner_dropdown_item);
         sourceSpinner.setAdapter(sourceAdapter);
 
         return view;

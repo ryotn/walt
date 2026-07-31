@@ -17,7 +17,6 @@
 package org.chromium.latency.walt;
 
 import android.Manifest;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -29,19 +28,25 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.Looper;
+import android.os.Parcelable;
 import android.os.StrictMode;
-import android.preference.PreferenceManager;
-import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentTransaction;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.Loader;
-import android.support.v4.content.LocalBroadcastManager;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
+import androidx.core.content.ContextCompat;
+import androidx.loader.content.Loader;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.preference.PreferenceManager;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -72,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
     private WaltDevice waltDevice;
     public Menu menu;
 
-    public Handler handler = new Handler();
+    public Handler handler = new Handler(Looper.getMainLooper());
 
 
     /**
@@ -106,22 +111,19 @@ public class MainActivity extends AppCompatActivity {
 
         final UsbDevice usbDevice;
         Intent intent = getIntent();
-        if (intent != null && intent.getAction().equals(UsbManager.ACTION_USB_DEVICE_ATTACHED)) {
+        if (intent != null && UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(intent.getAction())) {
             setIntent(null); // done with the intent
-            usbDevice = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+            usbDevice = getParcelableExtra(intent, UsbManager.EXTRA_DEVICE, UsbDevice.class);
         } else {
             usbDevice = null;
         }
 
         // Connect and sync clocks, but a bit later as it takes time
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (usbDevice == null) {
-                    waltDevice.connect();
-                } else {
-                    waltDevice.connect(usbDevice);
-                }
+        handler.postDelayed(() -> {
+            if (usbDevice == null) {
+                waltDevice.connect();
+            } else {
+                waltDevice.connect(usbDevice);
             }
         }, 1000);
 
@@ -147,21 +149,21 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         // App bar
-        toolbar = (Toolbar) findViewById(R.id.toolbar_main);
+        toolbar = findViewById(R.id.toolbar_main);
         setSupportActionBar(toolbar);
-        getSupportFragmentManager().addOnBackStackChangedListener(new FragmentManager.OnBackStackChangedListener() {
-            @Override
-            public void onBackStackChanged() {
-                int stackTopIndex = getSupportFragmentManager().getBackStackEntryCount() - 1;
-                if (stackTopIndex >= 0) {
-                    toolbar.setTitle(getSupportFragmentManager().getBackStackEntryAt(stackTopIndex).getName());
-                } else {
-                    toolbar.setTitle(R.string.app_name);
-                    getSupportActionBar().setDisplayHomeAsUpEnabled(false);
+        getSupportFragmentManager().addOnBackStackChangedListener(() -> {
+            int stackTopIndex = getSupportFragmentManager().getBackStackEntryCount() - 1;
+            if (stackTopIndex >= 0) {
+                toolbar.setTitle(getSupportFragmentManager().getBackStackEntryAt(stackTopIndex).getName());
+            } else {
+                toolbar.setTitle(R.string.app_name);
+                ActionBar actionBar = getSupportActionBar();
+                if (actionBar != null) {
+                    actionBar.setDisplayHomeAsUpEnabled(false);
                     // Disable fullscreen mode
-                    getSupportActionBar().show();
-                    getWindow().getDecorView().setSystemUiVisibility(0);
+                    actionBar.show();
                 }
+                clearFullscreenMode();
             }
         });
 
@@ -177,7 +179,7 @@ public class MainActivity extends AppCompatActivity {
         broadcastManager = LocalBroadcastManager.getInstance(this);
 
         // Add basic version and device info to the log
-        logger.log(String.format("WALT v%s  (versionCode=%d)",
+        logger.log(String.format(Locale.US, "WALT v%s  (versionCode=%d)",
                 BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));
         logger.log("WALT protocol version " + WaltDevice.PROTOCOL_VERSION);
         logger.log("DEVICE INFO:");
@@ -239,7 +241,10 @@ public class MainActivity extends AppCompatActivity {
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     private void switchScreen(Fragment newFragment, String title) {
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
         toolbar.setTitle(title);
         FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
         transaction.replace(R.id.fragment_container, newFragment);
@@ -355,10 +360,8 @@ public class MainActivity extends AppCompatActivity {
                 .setTitle("Press white button")
                 .setMessage("Please press the white button on the WALT device.")
                 .setCancelable(false)
-                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {}
-                }).show();
+                .setNegativeButton("Cancel", (dialog1, which) -> {})
+                .show();
 
             waltDevice.setConnectionStateListener(new WaltConnection.ConnectionStateListener() {
                 @Override
@@ -367,12 +370,7 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onDisconnect() {
                     dialog.cancel();
-                    handler.postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            new Programmer(MainActivity.this).program();
-                        }
-                    }, 1000);
+                    handler.postDelayed(() -> new Programmer(MainActivity.this).program(), 1000);
                 }
             });
         } else {
@@ -385,7 +383,11 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.WRITE_EXTERNAL_STORAGE);
         if (currentPermission == PackageManager.PERMISSION_GRANTED) {
             String filePath = saveLogToFile();
-            shareLogFile(filePath);
+            if (filePath != null) {
+                shareLogFile(filePath);
+            } else {
+                logger.log("Could not save log file");
+            }
         } else {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
@@ -401,10 +403,8 @@ public class MainActivity extends AppCompatActivity {
             logger.log("Could not get permission to write file to storage");
             return;
         }
-        switch (requestCode) {
-            case PERMISSION_REQUEST_WRITE_EXTERNAL_STORAGE_SHARE_LOG:
-                attemptSaveAndShareLog();
-                break;
+        if (requestCode == PERMISSION_REQUEST_WRITE_EXTERNAL_STORAGE_SHARE_LOG) {
+            attemptSaveAndShareLog();
         }
     }
 
@@ -418,32 +418,30 @@ public class MainActivity extends AppCompatActivity {
         // is frowned upon, but deliberately giving permissions as part of the intent is
         // way too cumbersome.
 
-        String fname = "qstep_log.txt";
+        String fileName = "qstep_log.txt";
         // A reasonable world readable location,on many phones it's /storage/emulated/Documents
         // TODO: make this location configurable?
         File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
         File file = null;
-        FileOutputStream outStream = null;
 
         Date now = new Date();
-        logger.log("Saving log to:\n" + path.getPath() + "/" + fname);
-        logger.log("On: " + now.toString());
+        logger.log("Saving log to:\n" + path.getPath() + "/" + fileName);
+        logger.log("On: " + now);
 
         try {
-            if (!path.exists()) {
-                path.mkdirs();
+            if (!path.exists() && !path.mkdirs()) {
+                logger.log("Could not create directory:\n" + path.getPath());
+                return null;
             }
-            file = new File(path, fname);
-            outStream = new FileOutputStream(file);
-            outStream.write(logger.getLogText().getBytes());
-
-            outStream.close();
+            file = new File(path, fileName);
+            try (FileOutputStream outStream = new FileOutputStream(file)) {
+                outStream.write(logger.getLogText().getBytes());
+            }
             logger.log("Log saved");
         } catch (Exception e) {
-            e.printStackTrace();
             logger.log("Exception:\n" + e.getMessage());
         }
-        return file.getPath();
+        return file != null ? file.getPath() : null;
     }
 
     public void shareLogFile(String filepath) {
@@ -473,55 +471,51 @@ public class MainActivity extends AppCompatActivity {
         final AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Upload log to URL")
                 .setView(R.layout.dialog_upload)
-                .setPositiveButton("Upload", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {}
-                })
-                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {}
-                })
+                .setPositiveButton("Upload", (dialog12, which) -> {})
+                .setNegativeButton("Cancel", (dialog1, which) -> {})
                 .show();
-        final EditText editText = (EditText) dialog.findViewById(R.id.edit_text);
+        final EditText editText = dialog.findViewById(R.id.edit_text);
+        if (editText == null) {
+            logger.log("Could not find upload URL input");
+            return;
+        }
         editText.setText(Utils.getStringPreference(
                 MainActivity.this, R.string.preference_log_url, ""));
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).
-                setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                View progress = dialog.findViewById(R.id.progress_bar);
-                String urlString = editText.getText().toString();
-                if (!startsWithHttp(urlString)) {
-                    urlString = "http://" + urlString;
-                }
-                editText.setVisibility(View.GONE);
-                progress.setVisibility(View.VISIBLE);
-                LogUploader uploader = new LogUploader(MainActivity.this, urlString);
-                final String finalUrlString = urlString;
-                uploader.registerListener(1, new Loader.OnLoadCompleteListener<Integer>() {
-                    @Override
-                    public void onLoadComplete(Loader<Integer> loader, Integer data) {
-                        dialog.cancel();
-                        if (data == -1) {
-                            Toast.makeText(MainActivity.this,
-                                    "Failed to upload log", Toast.LENGTH_SHORT).show();
-                            return;
-                        } else if (data / 100 == 2) {
-                            Toast.makeText(MainActivity.this,
-                                    "Log successfully uploaded", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(MainActivity.this,
-                                    "Failed to upload log. Server returned status code " + data,
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                        SharedPreferences preferences = PreferenceManager
-                                .getDefaultSharedPreferences(MainActivity.this);
-                        preferences.edit().putString(
-                                getString(R.string.preference_log_url), finalUrlString).apply();
-                    }
-                });
-                uploader.startUpload();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            View progress = dialog.findViewById(R.id.progress_bar);
+            String urlString = editText.getText().toString();
+            if (!startsWithHttp(urlString)) {
+                urlString = "http://" + urlString;
             }
+            editText.setVisibility(View.GONE);
+            if (progress != null) {
+                progress.setVisibility(View.VISIBLE);
+            }
+            LogUploader uploader = new LogUploader(MainActivity.this, urlString);
+            final String finalUrlString = urlString;
+            uploader.registerListener(1, new Loader.OnLoadCompleteListener<Integer>() {
+                @Override
+                public void onLoadComplete(@NonNull Loader<Integer> loader, Integer data) {
+                    dialog.cancel();
+                    if (data == -1) {
+                        Toast.makeText(MainActivity.this,
+                                "Failed to upload log", Toast.LENGTH_SHORT).show();
+                        return;
+                    } else if (data / 100 == 2) {
+                        Toast.makeText(MainActivity.this,
+                                "Log successfully uploaded", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(MainActivity.this,
+                                "Failed to upload log. Server returned status code " + data,
+                                Toast.LENGTH_SHORT).show();
+                    }
+                    SharedPreferences preferences = PreferenceManager
+                            .getDefaultSharedPreferences(MainActivity.this);
+                    preferences.edit().putString(
+                            getString(R.string.preference_log_url), finalUrlString).apply();
+                }
+            });
+            uploader.startUpload();
         });
     }
 
@@ -535,6 +529,22 @@ public class MainActivity extends AppCompatActivity {
                         PERMISSION_REQUEST_WRITE_EXTERNAL_STORAGE_SYSTRACE);
             }
         }
+    }
+
+    private void clearFullscreenMode() {
+        WindowInsetsControllerCompat insetsController =
+                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        if (insetsController != null) {
+            insetsController.show(WindowInsetsCompat.Type.systemBars());
+        }
+    }
+
+    private static <T extends Parcelable> T getParcelableExtra(
+            @NonNull Intent intent, @NonNull String key, @NonNull Class<T> type) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return intent.getParcelableExtra(key, type);
+        }
+        return intent.getParcelableExtra(key);
     }
 
 }
