@@ -17,6 +17,9 @@
 
 namespace {
 
+constexpr char kPackageName[] = "org.chromium.latency.walt";
+constexpr char kAudioAttributionTag[] = "audio";
+
 class WaltOboeRecorderCallback : public oboe::AudioStreamDataCallback {
   public:
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream *audio_stream,
@@ -170,6 +173,8 @@ void openRecorderLocked(int32_t frame_rate, int32_t frames_to_record) {
 
     oboe::AudioStreamBuilder builder;
     builder.setDirection(oboe::Direction::Input)
+            ->setPackageName(kPackageName)
+            ->setAttributionTag(kAudioAttributionTag)
             ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
             ->setSharingMode(oboe::SharingMode::Exclusive)
             ->setInputPreset(oboe::InputPreset::VoiceRecognition)

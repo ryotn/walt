@@ -27,7 +27,7 @@ LOCAL_LDFLAGS := -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384
 # needed for logcat
 LOCAL_SHARED_LIBRARIES := libcutils oboe
 
-LOCAL_LDLIBS := -llog
+LOCAL_LDLIBS := -lOpenSLES -llog
 
 include $(BUILD_SHARED_LIBRARY)
 
