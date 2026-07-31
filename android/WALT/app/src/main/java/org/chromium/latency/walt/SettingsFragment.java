@@ -71,7 +71,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements Prefer
                     NumberPickerPreferenceDialogFragmentCompat.newInstance(preference.getKey());
             fragment.setTargetFragment(this, 0);
             fragment.show(getFragmentManager(),
-                    "android.support.v7.preference.PreferenceFragment.DIALOG");
+                    "androidx.preference.PreferenceFragment.DIALOG");
         } else {
             super.onDisplayPreferenceDialog(preference);
         }
