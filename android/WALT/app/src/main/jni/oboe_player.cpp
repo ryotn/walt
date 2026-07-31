@@ -32,7 +32,8 @@ class WaltOboeCallback : public oboe::AudioStreamDataCallback {
         for (int32_t i = 0; i < num_frames; ++i) {
             int remaining = tone_frames_remaining_.load(std::memory_order_acquire);
             if (remaining > 0) {
-                out[i] = ((wave_index_++ & 0x2) ? MAXIMUM_AMPLITUDE_VALUE : -MAXIMUM_AMPLITUDE_VALUE);
+                uint32_t wave_index = wave_index_.fetch_add(1, std::memory_order_acq_rel);
+                out[i] = ((wave_index & 0x2) ? MAXIMUM_AMPLITUDE_VALUE : -MAXIMUM_AMPLITUDE_VALUE);
                 tone_frames_remaining_.store(remaining - 1, std::memory_order_release);
             } else {
                 out[i] = 0;
@@ -59,6 +60,7 @@ class WaltOboeCallback : public oboe::AudioStreamDataCallback {
         tone_frames_remaining_.store(BUFFERS_TO_PLAY * frames_per_burst_.load(std::memory_order_acquire),
                                      std::memory_order_release);
         first_tone_frame_pending_.store(true, std::memory_order_release);
+        wave_index_.store(0, std::memory_order_release);
     }
 
     int64_t getPlayTimestamp() const {
@@ -75,7 +77,7 @@ class WaltOboeCallback : public oboe::AudioStreamDataCallback {
     std::atomic<int32_t> tone_frames_remaining_{0};
     std::atomic<bool> warmed_up_{false};
     std::atomic<bool> first_tone_frame_pending_{false};
-    uint32_t wave_index_ = 0;
+    std::atomic<uint32_t> wave_index_{0};
 };
 
 std::shared_ptr<oboe::AudioStream> g_stream;
@@ -184,8 +186,8 @@ extern "C" void oboe_stop_tests(void) {
         __android_log_print(ANDROID_LOG_WARN, APPNAME, "Failed to stop Oboe stream: %s",
                             oboe::convertToText(result));
     }
+}
 
-    extern "C" int64_t oboe_get_te_play(void) {
-        return g_callback.getPlayTimestamp();
-    }
+extern "C" int64_t oboe_get_te_play(void) {
+    return g_callback.getPlayTimestamp();
 }
