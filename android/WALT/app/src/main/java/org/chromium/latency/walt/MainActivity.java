@@ -547,9 +547,9 @@ public class MainActivity extends AppCompatActivity {
         WindowInsetsControllerCompat insetsController =
                 WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         if (insetsController != null) {
-            insetsController.setAppearanceLightStatusBars(false);
+            insetsController.setAppearanceLightStatusBars(true);
         }
-        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.ColorPrimaryDark));
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.ColorPrimary));
     }
 
     private static <T extends Parcelable> T getParcelableExtra(
