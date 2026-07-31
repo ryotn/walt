@@ -16,6 +16,10 @@
 
 #include <inttypes.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define CLOCK_BUFFER_LENGTH 512
 
 // Commands, original definitions in TensyUSB side code.
@@ -48,3 +52,6 @@ void sync_clocks(struct clock_connection *clk);
 // Run the sync logic without changing clocks, used for estimating clock drift
 void update_bounds(struct clock_connection *clk);
 
+#ifdef __cplusplus
+}
+#endif
