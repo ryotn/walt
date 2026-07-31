@@ -26,6 +26,7 @@
 #include <SLES/OpenSLES_Android.h>
 #include <SLES/OpenSLES_AndroidConfiguration.h>
 
+#include "oboe_player.h"
 #include "sync_clock.h"
 
 // logging
@@ -38,11 +39,6 @@ static SLEngineItf engineEngine = NULL;
 // output mix interfaces
 static SLObjectItf outputMixObject = NULL;
 
-// buffer queue player interfaces
-static SLObjectItf bqPlayerObject = NULL;
-static SLPlayItf bqPlayerPlay = NULL;
-static SLAndroidSimpleBufferQueueItf bqPlayerBufferQueue = NULL;
-
 // recorder interfaces
 static SLObjectItf recorderObject = NULL;
 static SLRecordItf recorderRecord;
@@ -53,122 +49,12 @@ static unsigned int recorder_frames;
 static short* recorderBuffer;
 static unsigned recorderSize = 0;
 
-static unsigned int framesPerBuffer;
-
 #define CHANNELS 1  // 1 for mono, 2 for stereo
-
-// Each short represents a 16-bit audio sample
-static short* beepBuffer = NULL;
-static short* silenceBuffer = NULL;
-static unsigned int bufferSizeInBytes = 0;
-
-#define MAXIMUM_AMPLITUDE_VALUE 32767
-
-// how many times to play the wave table (so we can actually hear it)
-#define BUFFERS_TO_PLAY 10
-
-static unsigned buffersRemaining = 0;
-static short warmedUp = 0;
-
 
 // Timestamps
 // te - enqueue time
 // tc - callback time
-int64_t te_play = 0, te_rec = 0, tc_rec = 0;
-
-/**
- * Create wave tables for audio out.
- */
-void createWaveTables(){
-    bufferSizeInBytes = framesPerBuffer * sizeof(*beepBuffer);
-    silenceBuffer = malloc(bufferSizeInBytes);
-    beepBuffer = malloc(bufferSizeInBytes);
-
-
-    __android_log_print(ANDROID_LOG_VERBOSE,
-                        APPNAME,
-                        "Creating wave tables, 1 channel. Frames: %i Buffer size (bytes): %i",
-                        framesPerBuffer,
-                        bufferSizeInBytes);
-
-    unsigned int i;
-    for (i = 0; i < framesPerBuffer; i++) {
-        silenceBuffer[i] = 0;
-        beepBuffer[i] = (i & 2 - 1) * MAXIMUM_AMPLITUDE_VALUE;
-        // This fills a buffer that looks like [min, min, max, max, min, min...]
-        // which is a square wave at 1/4 frequency of the sampling rate
-        // for 48kHz sampling this is 12kHz pitch, still well audible.
-    }
-}
-
-// this callback handler is called every time a buffer finishes playing
-void bqPlayerCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
-{
-    if (bq == NULL) {
-        __android_log_print(ANDROID_LOG_ERROR, APPNAME, "buffer queue is null");
-    }
-    assert(bq == bqPlayerBufferQueue);
-    assert(NULL == context);
-
-    if (buffersRemaining > 0) { // continue playing tone
-        if(buffersRemaining == BUFFERS_TO_PLAY && warmedUp) {
-            // Enqueue the first non-silent buffer, save the timestamp
-            // For cold test Enqueue happens in playTone rather than here.
-            te_play = uptimeMicros();
-        }
-        buffersRemaining--;
-
-        SLresult result = (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, beepBuffer,
-                                                          bufferSizeInBytes);
-        (void)result;
-        assert(SL_RESULT_SUCCESS == result);
-    } else if (warmedUp) {      // stop tone but keep playing silence
-        SLresult result = (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, silenceBuffer,
-                                                 bufferSizeInBytes);
-        assert(SL_RESULT_SUCCESS == result);
-        (void) result;
-    } else {                    // stop playing completely
-        SLresult result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
-        assert(SL_RESULT_SUCCESS == result);
-        (void)result;
-
-        __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "Done playing tone");
-    }
-}
-
-jlong Java_org_chromium_latency_walt_AudioTest_playTone(JNIEnv* env, jclass clazz){
-
-    int64_t t_start = uptimeMicros();
-    te_play = 0;
-
-    SLresult result;
-
-    if (!warmedUp) {
-        result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
-        assert(SL_RESULT_SUCCESS == result);
-        (void)result;
-
-        // Enqueue first buffer
-        te_play = uptimeMicros();
-        result = (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, beepBuffer,
-                                                 bufferSizeInBytes);
-        assert(SL_RESULT_SUCCESS == result);
-        (void) result;
-
-        result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
-        assert(SL_RESULT_SUCCESS == result);
-        (void) result;
-
-        int dt_state = uptimeMicros() - t_start;
-        __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "playTone() changed state to playing dt=%d us", dt_state);
-        // TODO: this block takes lots of time (~13ms on Nexus 7) research this and decide how to measure.
-    }
-
-    __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "Playing tone");
-    buffersRemaining = BUFFERS_TO_PLAY;
-
-    return (jlong) t_start;
-}
+int64_t te_rec = 0, tc_rec = 0;
 
 
 // create the engine and output mix objects
@@ -204,12 +90,13 @@ void Java_org_chromium_latency_walt_AudioTest_createEngine(JNIEnv* env, jclass c
     (void)result;
 }
 
+jlong Java_org_chromium_latency_walt_AudioTest_playTone(JNIEnv* env, jclass clazz){
+    return (jlong) oboe_play_tone();
+}
+
 void Java_org_chromium_latency_walt_AudioTest_destroyEngine(JNIEnv *env, jclass clazz)
 {
-    if (bqPlayerObject != NULL) {
-        (*bqPlayerObject)->Destroy(bqPlayerObject);
-        bqPlayerObject = NULL;
-    }
+    oboe_destroy_player();
 
     if (outputMixObject != NULL) {
         (*outputMixObject)->Destroy(outputMixObject);
@@ -226,117 +113,18 @@ void Java_org_chromium_latency_walt_AudioTest_destroyEngine(JNIEnv *env, jclass 
 void Java_org_chromium_latency_walt_AudioTest_createBufferQueueAudioPlayer(JNIEnv* env,
         jclass clazz, jint optimalFrameRate, jint optimalFramesPerBuffer)
 {
-    __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "Creating audio player with frame rate %d and frames per buffer %d",
+    __android_log_print(ANDROID_LOG_VERBOSE, APPNAME,
+                        "Creating Oboe audio player with frame rate %d and frames per buffer %d",
                         optimalFrameRate, optimalFramesPerBuffer);
-
-    framesPerBuffer = optimalFramesPerBuffer;
-    createWaveTables();
-
-    SLresult result;
-
-    // configure the audio source (supply data through a buffer queue in PCM format)
-    SLDataLocator_AndroidSimpleBufferQueue locator_bufferqueue_source;
-    SLDataFormat_PCM format_pcm;
-    SLDataSource audio_source;
-
-    // source location
-    locator_bufferqueue_source.locatorType = SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE;
-    locator_bufferqueue_source.numBuffers = 1;
-
-    // source format
-    format_pcm.formatType = SL_DATAFORMAT_PCM;
-    format_pcm.numChannels = 1;
-
-    // Note: this shouldn't be called samplesPerSec it should be called *framesPerSec*
-    // because when channels = 2 then there are 2 samples per frame.
-    format_pcm.samplesPerSec = (SLuint32) optimalFrameRate * 1000;
-    format_pcm.bitsPerSample = SL_PCMSAMPLEFORMAT_FIXED_16;
-    format_pcm.containerSize = 16;
-    format_pcm.channelMask = SL_SPEAKER_FRONT_CENTER;
-    format_pcm.endianness = SL_BYTEORDER_LITTLEENDIAN;
-
-    audio_source.pLocator = &locator_bufferqueue_source;
-    audio_source.pFormat = &format_pcm;
-
-    // configure the output: An output mix sink
-    SLDataLocator_OutputMix locator_output_mix;
-    SLDataSink audio_sink;
-
-    locator_output_mix.locatorType = SL_DATALOCATOR_OUTPUTMIX;
-    locator_output_mix.outputMix = outputMixObject;
-
-    audio_sink.pLocator = &locator_output_mix;
-    audio_sink.pFormat = NULL;
-
-    // create audio player
-    // Note: Adding other output interfaces here will result in your audio being routed using the
-    // normal path NOT the fast path
-    const SLInterfaceID interface_ids[2] = { SL_IID_ANDROIDSIMPLEBUFFERQUEUE, SL_IID_VOLUME };
-    const SLboolean interfaces_required[2] = { SL_BOOLEAN_TRUE, SL_BOOLEAN_TRUE };
-
-    result = (*engineEngine)->CreateAudioPlayer(
-        engineEngine,
-        &bqPlayerObject,
-        &audio_source,
-        &audio_sink,
-        2, // Number of interfaces
-        interface_ids,
-        interfaces_required
-    );
-
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
-
-    // realize the player
-    result = (*bqPlayerObject)->Realize(bqPlayerObject, SL_BOOLEAN_FALSE);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
-
-    // get the play interface
-    result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_PLAY, &bqPlayerPlay);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
-
-    // get the buffer queue interface
-    result = (*bqPlayerObject)->GetInterface(bqPlayerObject, SL_IID_BUFFERQUEUE,
-            &bqPlayerBufferQueue);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
-
-    // register callback on the buffer queue
-    result = (*bqPlayerBufferQueue)->RegisterCallback(bqPlayerBufferQueue, bqPlayerCallback, NULL);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    oboe_create_player((int32_t) optimalFrameRate, (int32_t) optimalFramesPerBuffer);
 }
 
 void Java_org_chromium_latency_walt_AudioTest_startWarmTest(JNIEnv* env, jclass clazz) {
-    SLresult result;
-
-    result = (*bqPlayerBufferQueue)->Clear(bqPlayerBufferQueue);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
-
-    // enqueue some silence
-    result = (*bqPlayerBufferQueue)->Enqueue(bqPlayerBufferQueue, silenceBuffer, bufferSizeInBytes);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
-
-    // set the player's state to playing
-    result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_PLAYING);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
-
-    warmedUp = 1;
+    oboe_start_warm_test();
 }
 
 void Java_org_chromium_latency_walt_AudioTest_stopTests(JNIEnv *env, jclass clazz) {
-    SLresult result;
-
-    result = (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
-
-    warmedUp = 0;
+    oboe_stop_tests();
 }
 
 // this callback handler is called every time a buffer finishes recording
@@ -516,5 +304,5 @@ jlong Java_org_chromium_latency_walt_AudioTest_getTeRec(JNIEnv *env, jclass cls)
 }
 
 jlong Java_org_chromium_latency_walt_AudioTest_getTePlay(JNIEnv *env, jclass cls) {
-    return (jlong) te_play;
+    return (jlong) oboe_get_te_play();
 }
