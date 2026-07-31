@@ -15,7 +15,6 @@
  */
 
 #include <android/log.h>
-#include <assert.h>
 #include <jni.h>
 #include <malloc.h>
 #include <math.h>
@@ -56,38 +55,80 @@ static unsigned recorderSize = 0;
 // tc - callback time
 int64_t te_rec = 0, tc_rec = 0;
 
+static void destroyRecorder(void) {
+    bqPlayerRecorderBusy = 0;
+    recorderRecord = NULL;
+    recorderBufferQueue = NULL;
+    if (recorderObject != NULL) {
+        (*recorderObject)->Destroy(recorderObject);
+        recorderObject = NULL;
+    }
+    if (recorderBuffer != NULL) {
+        free(recorderBuffer);
+        recorderBuffer = NULL;
+    }
+    recorder_frames = 0;
+    recorderSize = 0;
+}
+
 
 // create the engine and output mix objects
 void Java_org_chromium_latency_walt_AudioTest_createEngine(JNIEnv* env, jclass clazz)
 {
     __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "Creating audio engine");
 
+    if (engineObject != NULL && engineEngine != NULL) {
+        return;
+    }
+
     SLresult result;
 
     // create engine
     result = slCreateEngine(&engineObject, 0, NULL, 0, NULL, NULL);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result || engineObject == NULL) {
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "Failed to create audio engine, result=%d", result);
+        engineObject = NULL;
+        return;
+    }
 
     // realize the engine
     result = (*engineObject)->Realize(engineObject, SL_BOOLEAN_FALSE);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result) {
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "Failed to realize audio engine, result=%d", result);
+        (*engineObject)->Destroy(engineObject);
+        engineObject = NULL;
+        return;
+    }
 
     // get the engine interface, which is needed in order to create other objects
     result = (*engineObject)->GetInterface(engineObject, SL_IID_ENGINE, &engineEngine);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result || engineEngine == NULL) {
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "Failed to get engine interface, result=%d", result);
+        (*engineObject)->Destroy(engineObject);
+        engineObject = NULL;
+        engineEngine = NULL;
+        return;
+    }
 
-    // create output mix,
+    // create output mix
     result = (*engineEngine)->CreateOutputMix(engineEngine, &outputMixObject, 0, NULL, NULL);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result || outputMixObject == NULL) {
+        __android_log_print(ANDROID_LOG_WARN, APPNAME,
+                            "Failed to create output mix, result=%d", result);
+        return;
+    }
 
     // realize the output mix
     result = (*outputMixObject)->Realize(outputMixObject, SL_BOOLEAN_FALSE);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result) {
+        __android_log_print(ANDROID_LOG_WARN, APPNAME,
+                            "Failed to realize output mix, result=%d", result);
+        (*outputMixObject)->Destroy(outputMixObject);
+        outputMixObject = NULL;
+    }
 }
 
 jlong Java_org_chromium_latency_walt_AudioTest_playTone(JNIEnv* env, jclass clazz){
@@ -96,6 +137,7 @@ jlong Java_org_chromium_latency_walt_AudioTest_playTone(JNIEnv* env, jclass claz
 
 void Java_org_chromium_latency_walt_AudioTest_destroyEngine(JNIEnv *env, jclass clazz)
 {
+    destroyRecorder();
     oboe_destroy_player();
 
     if (outputMixObject != NULL) {
@@ -107,6 +149,7 @@ void Java_org_chromium_latency_walt_AudioTest_destroyEngine(JNIEnv *env, jclass 
         (*engineObject)->Destroy(engineObject);
         engineObject = NULL;
     }
+    engineEngine = NULL;
 }
 
 // create buffer queue audio player
@@ -131,8 +174,11 @@ void Java_org_chromium_latency_walt_AudioTest_stopTests(JNIEnv *env, jclass claz
 void bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 {
     tc_rec = uptimeMicros();
-    assert(bq == recorderBufferQueue);
-    assert(NULL == context);
+    if (bq != recorderBufferQueue || context != NULL || recorderRecord == NULL) {
+        __android_log_print(ANDROID_LOG_WARN, APPNAME, "Invalid recorder callback state");
+        bqPlayerRecorderBusy = 0;
+        return;
+    }
 
     // for streaming recording, here we would call Enqueue to give recorder the next buffer to fill
     // but instead, this is a one-time buffer so we stop recording
@@ -150,18 +196,32 @@ void bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *context)
 }
 
 // create audio recorder
-jboolean Java_org_chromium_latency_walt_AudioTest_createAudioRecorder(JNIEnv* env,
+void Java_org_chromium_latency_walt_AudioTest_createAudioRecorder(JNIEnv* env,
     jclass clazz, jint optimalFrameRate, jint framesToRecord)
 {
     SLresult result;
 
     __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "Creating audio recorder with frame rate %d and frames to record %d",
                         optimalFrameRate, framesToRecord);
-    // Allocate buffer
-    recorder_frames = framesToRecord;
-    recorderBuffer = malloc(sizeof(*recorderBuffer) * recorder_frames);
+if (engineEngine == NULL) {
+    __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                        "Audio engine is not initialized; recorder unavailable");
+    return;
+}
 
-    // configure audio source
+destroyRecorder();
+
+// Allocate buffer
+recorder_frames = framesToRecord;
+recorderBuffer = malloc(sizeof(*recorderBuffer) * recorder_frames);
+if (recorderBuffer == NULL) {
+    __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                        "Failed to allocate recorder buffer for %u frames", recorder_frames);
+    recorder_frames = 0;
+    return;
+}
+
+// configure audio source
     SLDataLocator_IODevice loc_dev = {
             SL_DATALOCATOR_IODEVICE,
             SL_IODEVICE_AUDIOINPUT,
@@ -202,6 +262,12 @@ jboolean Java_org_chromium_latency_walt_AudioTest_createAudioRecorder(JNIEnv* en
                                               &audioSnk,
                                               sizeof(id)/sizeof(id[0]),
                                               id, req);
+    if (SL_RESULT_SUCCESS != result || recorderObject == NULL) {
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "Failed to create audio recorder, result=%d", result);
+        destroyRecorder();
+        return;
+    }
 
     // Configure the voice recognition preset which has no
     // signal processing for lower latency.
@@ -220,30 +286,43 @@ jboolean Java_org_chromium_latency_walt_AudioTest_createAudioRecorder(JNIEnv* en
     // realize the audio recorder
     result = (*recorderObject)->Realize(recorderObject, SL_BOOLEAN_FALSE);
     if (SL_RESULT_SUCCESS != result) {
-        return JNI_FALSE;
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "Failed to realize audio recorder, result=%d", result);
+        destroyRecorder();
+        return;
     }
 
     // get the record interface
     result = (*recorderObject)->GetInterface(recorderObject, SL_IID_RECORD, &recorderRecord);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result || recorderRecord == NULL) {
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "Failed to get recorder interface, result=%d", result);
+        destroyRecorder();
+        return;
+    }
 
     // get the buffer queue interface
     result = (*recorderObject)->GetInterface(recorderObject, SL_IID_ANDROIDSIMPLEBUFFERQUEUE,
             &recorderBufferQueue);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result || recorderBufferQueue == NULL) {
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "Failed to get recorder queue interface, result=%d", result);
+        destroyRecorder();
+        return;
+    }
 
     // register callback on the buffer queue
     result = (*recorderBufferQueue)->RegisterCallback(recorderBufferQueue, bqRecorderCallback,
             NULL);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result) {
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "Failed to register recorder callback, result=%d", result);
+        destroyRecorder();
+        return;
+    }
 
     __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "Audio recorder created, buffer size: %d frames",
                         recorder_frames);
-
-    return JNI_TRUE;
 }
 
 
@@ -252,16 +331,29 @@ void Java_org_chromium_latency_walt_AudioTest_startRecording(JNIEnv* env, jclass
 {
     SLresult result;
 
+    if (recorderRecord == NULL || recorderBufferQueue == NULL || recorderBuffer == NULL ||
+        recorder_frames == 0) {
+        __android_log_print(ANDROID_LOG_WARN, APPNAME,
+                            "Recorder is not ready; skipping recording");
+        return;
+    }
+
     if( bqPlayerRecorderBusy) {
         return;
     }
     // in case already recording, stop recording and clear buffer queue
     result = (*recorderRecord)->SetRecordState(recorderRecord, SL_RECORDSTATE_STOPPED);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result) {
+        __android_log_print(ANDROID_LOG_WARN, APPNAME,
+                            "Failed to stop recorder before start, result=%d", result);
+        return;
+    }
     result = (*recorderBufferQueue)->Clear(recorderBufferQueue);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result) {
+        __android_log_print(ANDROID_LOG_WARN, APPNAME,
+                            "Failed to clear recorder queue, result=%d", result);
+        return;
+    }
 
     // the buffer is not valid for playback yet
     recorderSize = 0;
@@ -274,24 +366,36 @@ void Java_org_chromium_latency_walt_AudioTest_startRecording(JNIEnv* env, jclass
             recorder_frames * sizeof(short));
     // the most likely other result is SL_RESULT_BUFFER_INSUFFICIENT,
     // which for this code example would indicate a programming error
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result) {
+        __android_log_print(ANDROID_LOG_WARN, APPNAME,
+                            "Failed to enqueue recorder buffer, result=%d", result);
+        return;
+    }
 
     // start recording
     result = (*recorderRecord)->SetRecordState(recorderRecord, SL_RECORDSTATE_RECORDING);
-    assert(SL_RESULT_SUCCESS == result);
-    (void)result;
+    if (SL_RESULT_SUCCESS != result) {
+        __android_log_print(ANDROID_LOG_WARN, APPNAME,
+                            "Failed to start recording, result=%d", result);
+        return;
+    }
     bqPlayerRecorderBusy = 1;
 }
 
 jshortArray Java_org_chromium_latency_walt_AudioTest_getRecordedWave(JNIEnv *env, jclass cls)
 {
     jshortArray result;
-    result = (*env)->NewShortArray(env, recorder_frames);
+    jsize frames = recorder_frames;
+    if (recorderBuffer == NULL || frames < 0) {
+        frames = 0;
+    }
+    result = (*env)->NewShortArray(env, frames);
     if (result == NULL) {
         return NULL; /* out of memory error thrown */
     }
-    (*env)->SetShortArrayRegion(env, result, 0, recorder_frames, recorderBuffer);
+    if (frames > 0) {
+        (*env)->SetShortArrayRegion(env, result, 0, frames, recorderBuffer);
+    }
     return result;
 }
 
