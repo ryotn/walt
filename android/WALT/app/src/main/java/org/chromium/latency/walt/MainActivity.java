@@ -532,8 +532,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void clearFullscreenMode() {
+        View decorView = getWindow().getDecorView();
+        decorView.setSystemUiVisibility(0);
         WindowInsetsControllerCompat insetsController =
-                WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+                WindowCompat.getInsetsController(getWindow(), decorView);
         if (insetsController != null) {
             insetsController.show(WindowInsetsCompat.Type.systemBars());
         }
