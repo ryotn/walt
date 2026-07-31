@@ -611,6 +611,9 @@ public class ScreenResponseFragment extends Fragment implements View.OnClickList
             if (insetsController != null) {
                 insetsController.show(WindowInsetsCompat.Type.systemBars());
             }
+            if (activity instanceof MainActivity) {
+                ((MainActivity) activity).applyStatusBarAppearance();
+            }
         }
     }
 }
