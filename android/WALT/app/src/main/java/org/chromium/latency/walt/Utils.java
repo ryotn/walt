@@ -19,7 +19,7 @@ package org.chromium.latency.walt;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
-import android.support.annotation.StringRes;
+import androidx.annotation.StringRes;
 
 import com.github.mikephil.charting.data.Entry;
 
