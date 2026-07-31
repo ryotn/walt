@@ -22,6 +22,7 @@ LOCAL_SRC_FILES := sync_clock_jni.c sync_clock.c player.c oboe_player.cpp
 
 LOCAL_CFLAGS := -nostartfiles -g -DUSE_LIBLOG -Werror
 LOCAL_CPPFLAGS := -nostartfiles -g -DUSE_LIBLOG -Werror -std=c++17
+LOCAL_LDFLAGS := -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384
 
 # needed for logcat
 LOCAL_SHARED_LIBRARIES := libcutils oboe
